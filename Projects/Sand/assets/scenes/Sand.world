@@ -1,0 +1,92 @@
+{
+ "Entities": [
+  {
+   "Name": "Environment",
+   "UUID": "3361868674435394754",
+   "Components": {
+    "Snowstorm::EnvironmentComponent": {
+     "Background": "SolidColor",
+     "SkyIntensity": 0.0,
+     "SkyZenithColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "SkyHorizonColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "GroundColor": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "Name": "Main Camera",
+   "UUID": "9032961526858459136",
+   "Components": {
+    "Snowstorm::CameraComponent": {
+     "Projection": "Orthographic",
+     "OrthographicSize": 4.5,
+     "OrthographicNear": -10.0,
+     "OrthographicFar": 10.0,
+     "Primary": true
+    },
+    "Snowstorm::TransformComponent": {
+     "Position": [
+      0.0,
+      0.0,
+      5.0
+     ],
+     "Rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "Scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    }
+   }
+  },
+  {
+   "Name": "World",
+   "UUID": "1124273704088968066",
+   "Components": {
+    "Snowstorm::MeshComponent": {
+     "$asset": "12112538743247314239"
+    },
+    "Snowstorm::MaterialComponent": {
+     "$asset": "2589093168120069637"
+    },
+    "Snowstorm::VisibilityComponent": {
+     "Mask": 3
+    },
+    "Snowstorm::TransformComponent": {
+     "Position": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "Rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "Scale": [
+      16.0,
+      9.0,
+      1.0
+     ]
+    }
+   }
+  }
+ ],
+ "Scene": "Sand"
+}

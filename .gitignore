@@ -1,0 +1,10 @@
+# Build output
+build/
+build-*/
+.vs/
+
+# Engine-side local state, when running from this repo
+SnowstormConfig.cfg
+SnowstormStartup.cfg
+SnowstormProfile-*.json
+Projects/*/Saved/

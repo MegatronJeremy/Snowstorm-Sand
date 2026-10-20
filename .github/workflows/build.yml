@@ -1,0 +1,50 @@
+name: build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Compile-and-link gate against the pinned engine commit, which is what most likely breaks here since
+  # the engine is developed in its own repository. Proves nothing about behaviour: running the game needs a
+  # Vulkan device, which hosted CI does not have.
+  windows:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout (with the engine submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # The engine builds every vcpkg dependency from source; keyed on its package list.
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: Snowstorm-Engine/vcpkg
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('Snowstorm-Engine/Scripts/Generate-Solution.py') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      # Run for the vcpkg tree it bootstraps; its own build dir is discarded.
+      - name: Bootstrap the engine's dependencies
+        run: py Snowstorm-Engine/Scripts/Generate-Solution.py --build-dir Snowstorm-Engine/build
+
+      # No -T toolset pin: the engine pins it because a divergence breaks Catch2's link, and nothing here
+      # builds Catch2.
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_TOOLCHAIN_FILE=Snowstorm-Engine/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build
+        run: cmake --build build --config Debug --target Snowstorm-Sand

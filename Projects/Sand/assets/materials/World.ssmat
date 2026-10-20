@@ -1,0 +1,11 @@
+{
+  "Type": "SnowstormMaterial",
+  "Version": 3,
+  "Shader": "/Game/shaders/World.frag.hlsl",
+  "BaseColor": [
+    0.05,
+    0.04,
+    0.06,
+    1.0
+  ]
+}

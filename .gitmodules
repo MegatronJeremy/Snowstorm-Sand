@@ -1,0 +1,4 @@
+[submodule "Snowstorm-Engine"]
+	path = Snowstorm-Engine
+	url = https://github.com/MegatronJeremy/Snowstorm-Engine.git
+	branch = feat/game-graph-passes

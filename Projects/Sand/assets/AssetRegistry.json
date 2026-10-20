@@ -1,0 +1,14 @@
+{
+  "Assets": [
+    {
+      "Handle": "12112538743247314239",
+      "Path": "/Game/meshes/quad.obj",
+      "Type": "Mesh"
+    },
+    {
+      "Handle": "2589093168120069637",
+      "Path": "/Game/materials/World.ssmat",
+      "Type": "Material"
+    }
+  ]
+}
