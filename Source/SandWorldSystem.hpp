@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Snowstorm/ECS/System.hpp"
+#include "Snowstorm/Render/Buffer.hpp"
 #include "Snowstorm/Render/DescriptorSet.hpp"
 #include "Snowstorm/Render/Pipeline.hpp"
 
@@ -29,6 +30,7 @@ namespace Snowstorm
 		bool EnsurePipelines();
 		void EnsureTextures(entt::entity e, SandWorldComponent& world, uint32_t width, uint32_t height);
 		[[nodiscard]] uint32_t StepsThisFrame(float seconds);
+		void WriteRetiredCaptures();
 		void LogStats();
 
 		Ref<Pipeline> m_SimPipeline;
@@ -45,6 +47,19 @@ namespace Snowstorm
 
 		float m_Accumulator = 0.0f;
 		uint32_t m_Step = 0; // seeds the sim's per-block random choices and picks the block offset
+
+		// sand.capture.steps: steps still to capture, and copies waiting for their frame to retire.
+		struct PendingCapture
+		{
+			Ref<Buffer> Readback;
+			uint32_t Step = 0;
+			uint32_t Width = 0;
+			uint32_t Height = 0;
+			uint64_t ReadyFrame = 0;
+		};
+		std::vector<uint32_t> m_PendingSteps;
+		std::vector<PendingCapture> m_Captures;
+		bool m_CaptureParsed = false;
 
 		// sand.stats window
 		uint32_t m_StatFrames = 0;

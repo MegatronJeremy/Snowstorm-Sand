@@ -6,8 +6,11 @@
 #include "Snowstorm/Components/SpriteComponent.hpp"
 #include "Snowstorm/Core/Application.hpp"
 #include "Snowstorm/Core/Log.hpp"
+#include "Snowstorm/Render/Buffer.hpp"
 #include "Snowstorm/Render/CommandContext.hpp"
+#include "Snowstorm/Render/DatasetExport/NpyWriter.hpp"
 #include "Snowstorm/Render/RenderGraph.hpp"
+#include "Snowstorm/Render/Renderer.hpp"
 #include "Snowstorm/Render/RendererService.hpp"
 #include "Snowstorm/Render/Shader.hpp"
 #include "Snowstorm/Render/Texture.hpp"
@@ -17,6 +20,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 
 namespace Snowstorm
 {
@@ -28,6 +32,10 @@ namespace Snowstorm
 		CVar<int> WidthOverride{"sand.width", 0, "World width in cells, overriding the scene. 0 = the scene's."};
 		CVar<int> HeightOverride{"sand.height", 0, "World height in cells, overriding the scene. 0 = the scene's."};
 		CVar<bool> Stats{"sand.stats", false, "Log the sim's GPU ms per step and the shade's ms per frame every 120 frames."};
+		CVar<std::string> CaptureSteps{"sand.capture.steps", "",
+		                               "Comma-separated sim steps at which to write the cell state to <sand.capture.path>_s<step>.npy "
+		                               "(height x width x 4 uint8, SandCell.hpp layout). The sim stops on each step exactly."};
+		CVar<std::string> CapturePath{"sand.capture.path", "sand-capture", "Output basename for sand.capture.steps, relative to the working directory."};
 
 		constexpr uint32_t kMaxStepsPerFrame = 8; // a long frame drops time rather than spiralling
 		constexpr uint32_t kGroupSize = 8;        // numthreads in SandSim/SandShade.comp.hlsl
@@ -62,6 +70,26 @@ namespace Snowstorm
 		{
 			return (n + kGroupSize - 1) / kGroupSize;
 		}
+
+		std::vector<uint32_t> ParseSteps(const std::string& list)
+		{
+			std::vector<uint32_t> steps;
+			std::stringstream in(list);
+			for (std::string token; std::getline(in, token, ',');)
+			{
+				try
+				{
+					steps.push_back(static_cast<uint32_t>(std::stoul(token)));
+				}
+				catch (const std::exception&)
+				{
+					SS_WARN("sand.capture.steps: '{}' is not a step; ignored.", token);
+				}
+			}
+			std::sort(steps.begin(), steps.end());
+			steps.erase(std::unique(steps.begin(), steps.end()), steps.end());
+			return steps;
+		}
 	}
 
 	bool SandWorldSystem::EnsurePipelines()
@@ -78,7 +106,7 @@ namespace Snowstorm
 	{
 		TextureDesc cells{};
 		cells.Format = PixelFormat::RGBA8_UNorm;
-		cells.Usage = TextureUsage::Sampled | TextureUsage::Storage | TextureUsage::TransferDst;
+		cells.Usage = TextureUsage::Sampled | TextureUsage::Storage | TextureUsage::TransferDst | TextureUsage::TransferSrc; // src: sand.capture
 		cells.Width = width;
 		cells.Height = height;
 		cells.MipLevels = 1;
@@ -133,9 +161,33 @@ namespace Snowstorm
 		return steps;
 	}
 
+	void SandWorldSystem::WriteRetiredCaptures()
+	{
+		const uint64_t frame = ServiceView<RendererService>().GetFrameCounter();
+		std::erase_if(m_Captures, [frame](PendingCapture& c)
+		              {
+			if (frame < c.ReadyFrame)
+				return false;
+			const std::string path = CapturePath.Get() + "_s" + std::to_string(c.Step) + ".npy";
+			const void* data = c.Readback->Map();
+			const size_t bytes = static_cast<size_t>(c.Width) * c.Height * 4;
+			if (WriteNpy(path, data, bytes, {c.Height, c.Width, 4}, NpyDType::UInt8))
+				SS_INFO("sand.capture: step {} -> {}", c.Step, path);
+			else
+				SS_ERROR("sand.capture: could not write {}", path);
+			c.Readback->Unmap();
+			return true; });
+	}
+
 	void SandWorldSystem::Execute(const Timestep ts)
 	{
 		m_Uploads.clear();
+		WriteRetiredCaptures();
+		if (!m_CaptureParsed)
+		{
+			m_PendingSteps = ParseSteps(CaptureSteps.Get());
+			m_CaptureParsed = true;
+		}
 		if (Stats.Get())
 		{
 			LogStats();
@@ -158,7 +210,11 @@ namespace Snowstorm
 			}
 
 			const SandWorldComponent& world = reg.Read<SandWorldComponent>(e);
-			const uint32_t steps = StepsThisFrame(ts.GetSeconds());
+			uint32_t steps = StepsThisFrame(ts.GetSeconds());
+			if (!m_PendingSteps.empty() && m_PendingSteps.front() >= m_Step)
+			{
+				steps = std::min(steps, m_PendingSteps.front() - m_Step); // stop exactly on the captured step
+			}
 			const uint32_t firstStep = m_Step;
 			m_Step += steps;
 			m_StatSteps += steps;
@@ -197,6 +253,25 @@ namespace Snowstorm
 			                           .IsCompute = true,
 			                           .Reads = {{world.Colors, RenderGraph::AccessState::Sampled}},
 			                           .Execute = [](CommandContext&) {}});
+
+			if (!m_PendingSteps.empty() && m_PendingSteps.front() == m_Step)
+			{
+				m_PendingSteps.erase(m_PendingSteps.begin());
+				PendingCapture capture{.Readback = Buffer::Create(static_cast<size_t>(width) * height * 4, BufferUsage::Readback,
+				                                                  nullptr, true, "SandCapture"),
+				                       .Step = m_Step,
+				                       .Width = width,
+				                       .Height = height,
+				                       // Mapped only once the copying frame's fence has certainly retired.
+				                       .ReadyFrame = renderer.GetFrameCounter() + Renderer::GetFramesInFlight() + 1};
+				// CopyTextureToBuffer expects the image sampled, which this pass's declared read arranges.
+				renderer.EnqueueGraphPass({.Name = "SandCapture",
+				                           .IsCompute = true,
+				                           .Reads = {{world.Cells, RenderGraph::AccessState::Sampled}},
+				                           .Execute = [cells = world.Cells, buffer = capture.Readback](CommandContext& c)
+				                           { c.CopyTextureToBuffer(cells, buffer); }});
+				m_Captures.push_back(std::move(capture));
+			}
 		}
 	}
 

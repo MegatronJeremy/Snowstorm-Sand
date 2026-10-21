@@ -66,6 +66,15 @@ void Swap(inout float4 x, inout float4 y)
 	y = t;
 }
 
+// Swap a horizontal pair when one side is liquid and the other lighter. Always, not by chance: a liquid on a
+// slope only meets its downhill neighbour in every other step's block, and gating that further left water
+// standing in mounds on the dunes.
+void FlowPair(inout float4 left, inout float4 right)
+{
+	if ((Material(left) == kWater && Displaces(left, right)) || (Material(right) == kWater && Displaces(right, left)))
+		Swap(left, right);
+}
+
 [numthreads(8, 8, 1)] void main(uint3 id : SV_DispatchThreadID)
 {
 	const int2 origin = int2(id.xy) * 2 - int(gSim.Offset);
@@ -98,14 +107,9 @@ void Swap(inout float4 x, inout float4 y)
 	else if (bSlides)
 		Swap(b, c);
 
-	// Flow: a liquid steps sideways into lighter matter half the time, which is what levels a pool.
-	if ((r & 2u) != 0)
-	{
-		if ((Material(a) == kWater && Displaces(a, b)) || (Material(b) == kWater && Displaces(b, a)))
-			Swap(a, b);
-		if ((Material(c) == kWater && Displaces(c, d)) || (Material(d) == kWater && Displaces(d, c)))
-			Swap(c, d);
-	}
+	// Flow: a liquid steps sideways into lighter matter, which is what levels a pool.
+	FlowPair(a, b);
+	FlowPair(c, d);
 
 	Store(origin, a);
 	Store(origin + int2(1, 0), b);
