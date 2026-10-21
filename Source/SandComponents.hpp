@@ -11,7 +11,8 @@ namespace Snowstorm
 		int Width = 320; // cells
 		int Height = 180;
 
-		// Runtime only (not reflected, so never serialized): one RGBA8 texel per cell.
-		Ref<Texture> Cells;
+		// Runtime only (not reflected, so never serialized).
+		Ref<Texture> Cells;  // RGBA8 cell state (SandCell.hpp), written in place by the sim
+		Ref<Texture> Colors; // RGBA16F linear colour per cell, what the sprite samples
 	};
 }
