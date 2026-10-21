@@ -9,6 +9,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Built from source as a subdirectory: the engine has no install/export package.
 add_subdirectory(Snowstorm-Engine)
 
+file(GLOB_RECURSE SAND_GAME_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.hpp"
+)
+
+add_library(SandGame STATIC ${SAND_GAME_SOURCES})
+
+set_target_properties(SandGame PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
+
+target_include_directories(SandGame PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Source")
+target_link_libraries(SandGame PUBLIC Snowstorm-Core)
+
 add_executable(Snowstorm-Sand "${CMAKE_CURRENT_SOURCE_DIR}/SandMain.cpp")
 
 set_target_properties(Snowstorm-Sand PROPERTIES
@@ -21,6 +37,7 @@ set_target_properties(Snowstorm-Sand PROPERTIES
 # references, and a plain link drops them silently rather than failing.
 target_link_libraries(Snowstorm-Sand PRIVATE
     $<LINK_LIBRARY:WHOLE_ARCHIVE,Snowstorm-Core>
+    $<LINK_LIBRARY:WHOLE_ARCHIVE,SandGame>
 )
 
 add_custom_command(TARGET Snowstorm-Sand POST_BUILD

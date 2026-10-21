@@ -40,11 +40,12 @@ jobs:
         run: py Snowstorm-Engine/Scripts/Generate-Solution.py --build-dir Snowstorm-Engine/build
 
       # No -T toolset pin: the engine pins it because a divergence breaks Catch2's link, and nothing here
-      # builds Catch2.
+      # builds Catch2. The -D argument is quoted because PowerShell, the default shell here, splits an
+      # unquoted argument that starts with '-' at a '.', which hands CMake ".../vcpkg" and ".cmake".
       - name: Configure
         run: >
           cmake -S . -B build
-          -DCMAKE_TOOLCHAIN_FILE=Snowstorm-Engine/vcpkg/scripts/buildsystems/vcpkg.cmake
+          "-DCMAKE_TOOLCHAIN_FILE=Snowstorm-Engine/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build
         run: cmake --build build --config Debug --target Snowstorm-Sand

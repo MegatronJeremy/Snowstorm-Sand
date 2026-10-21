@@ -2,6 +2,8 @@
 #include <Snowstorm/Core/EntryPoint.hpp>
 #include <Snowstorm/Core/GameLayer.hpp>
 
+#include "SandGame.hpp"
+
 namespace Snowstorm
 {
 	class SandApplication final : public Application
@@ -10,7 +12,9 @@ namespace Snowstorm
 		SandApplication()
 		    : Application("Snowstorm-Sand")
 		{
-			PushLayer(new GameLayer({}, "Projects/Sand/Sand.ssproj"));
+			PushLayer(new GameLayer([](World& world)
+			                        { RegisterSandSystems(world); },
+			                        "Projects/Sand/Sand.ssproj"));
 		}
 	};
 
